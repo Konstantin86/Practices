@@ -12,6 +12,12 @@ db.subscribers.findOne()
 // filter
 db.subscribers.find({id:10}).pretty()
 
+// filter by mask
+db.subscribers.find({email:/.*blog.*/}).pretty()
+
+// case insensitive search
+db.subscribers.find({last_name: { $regex: /harvey/i}}).pretty()
+
 // Greater then...
 db.subscribers.find({id:{$gt:5}}).pretty()
 

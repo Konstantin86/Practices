@@ -1,2 +1,2 @@
-. "$PSScriptRoot/bin/mongod" --install --config d:\git\practices\mongo\mongod.config
+. "$PSScriptRoot/bin/mongod" --install --config c:\git\practices\mongo\mongod.config
 net start "mongodb"
