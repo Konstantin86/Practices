@@ -1,0 +1,114 @@
+https://docs.mongodb.org/manual/tutorial/create-an-auto-incrementing-field/#auto-increment-counters-collection
+https://docs.mongodb.org/manual/core/sharding-shard-key/
+
+
+// query all
+db.subscribers.find()
+db.subscribers.find().pretty()
+
+// query one
+db.subscribers.findOne()
+
+// filter
+db.subscribers.find({id:10}).pretty()
+
+// Greater then...
+db.subscribers.find({id:{$gt:5}}).pretty()
+
+// Between...
+db.subscribers.find({id:{$gt:5, $lt:10},gender:"Female"}).pretty()
+
+// In range...
+db.subscribers.find({id:{$in:[5,10]}}).pretty()
+
+// field of embedded doc
+db.subscribers.find({"address.country":"China"}).pretty()
+
+// field value in embedded array
+db.subscribers.find({visits: {$elemMatch: {site:"vk"}}}).pretty()
+
+// Projections:
+// query only address field (_id will be included to result projection by default)
+db.subscribers.find({"address.country":"China"}, {address: 1}).pretty()
+
+// query only address field (_id won't be included, we explicitly omit it)
+db.subscribers.find({"address.country":"China"}, {address: 1, _id:0}).pretty()
+db.subscribers.find({"address.country":"China"}, {"address.city": 1, _id:0}).pretty()
+
+// explicitly exclude 2 fields
+db.subscribers.find({"address.country":"China"}, {"address.city": 0, _id:0}).pretty()
+
+// query only first two elements in embedded registered array
+db.subscribers.find({},{registered:{$slice:2}}).pretty()
+
+// Sort
+// sort by first_name descending then by id descending
+db.subscribers.find().sort({first_name:-1,id:-1}).pretty()
+db.subscribers.find({}, {first_name:1, id:1, _id:0}).sort({first_name:-1,id:-1}).pretty()
+
+// Limit
+// limit resulting set with 2 docs
+db.subscribers.find().sort({first_name:-1,id:-1}).limit(2).pretty()
+
+// skip 2 docs in resulting set
+db.subscribers.find().sort({first_name:-1,id:-1}).skip(2).pretty()
+
+// Write
+// Insert doc
+db.subscribers.insert({name:"Mark"})
+db.subscribers.find().skip(10).pretty()
+
+// Insert doc with explicitly specified id:
+db.subscribers.insert({_id: 1, name:"Mark"})
+
+// Insert collection
+db.subscribers.insert([{_id: 2, name:"Mark"}, {_id: 3, name:"David"}])
+
+// Update with replacing whole doc
+db.subscribers.update({_id: 2}, {name: "John", lastName: "Johnson"})
+
+// Update specific field
+db.subscribers.update({_id: 2}, {$set:{name:"Mark"}})
+
+// Update or insert if record doesn't existing
+db.subscribers.save({_id: 5, name:"Mark"})
+db.subscribers.save({_id: 1, name:"Mark2"})
+
+// Remove specific record
+db.subscribers.remove({_id:5})
+db.subscribers.drop()
+db.dropDatabase()
+
+// Aggregations:
+// field value in embedded array
+db.subscribers.find({visits: {$elemMatch: {site:"google"}}}).pretty()
+
+// unwind
+db.subscribers.aggregate([{$unwind:"$visits"}])
+
+// unwind + group by
+db.subscribers.aggregate([{$unwind:"$visits"}, {$group:{_id:"$gender", totals:{$sum:"$visits.count"}}}])
+
+// mapReduce
+db.subscribers.mapReduce(function() {emit(this.gender, this.visits.map(function(v){return v.count;}).reduce(function(a, b) { return a + b; }, 0));}, function(key, values) { return Array.sum(values)},{out:"visitedSitesCount"})
+db.visitedSitesCount.find()
+
+
+
+// INDEXES & Query Plans
+db.subscribers.getIndexes()
+
+// query info
+db.subscribers.find({name:"Carl"}).explain()
+
+// detailed query info
+db.subscribers.find({name:"Carl"}).explain(true)
+db.subscribers.find({name:"Carl"}).explain('executionStats')
+
+// create index
+db.subscribers.ensureIndex({name:1})
+db.subscribers.getIndexes()
+db.subscribers.find({name:"Carl"}).explain(true)
+
+// reindex
+db.subscribers.reIndex()
