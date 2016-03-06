@@ -1,0 +1,4 @@
+﻿Vasilyev|Viktor|Aleksandrovich|Male|Blue|2/23/1979
+Tikhonov|Mikhail|Valeryevich|Male|Green|3/25/1988
+Ustinova|Ulyana|Alekseyevna|Female|Purple|9/20/1977
+Yakovleva|Tatiana|Igorevna|Female|Pink|5/9/1994

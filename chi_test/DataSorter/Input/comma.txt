@@ -1,0 +1,4 @@
+﻿Aleksandrova,Anastasia,Female,Pink,6/25/1975
+Zaytsev,Andrey,Male,Yellow,11/5/1982
+Stasova,Svetlana,Female,Green,1/22/1991
+Kasyanova,Olga,Female,Red,8/15/1986
