@@ -1,17 +1,25 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace DataSorter
 {
     public class PersonParser
     {
-        private readonly Dictionary<char, Func<string, Person>> _separatorParsers = new Dictionary<char, Func<string, Person>>
+        private readonly Dictionary<char, Func<string, Person>> _separatorParsers;
+
+        CultureInfo _culture = new CultureInfo("en-US");
+
+        public PersonParser()
         {
-            { '|', ParseByPipe },
-            { ',', ParseByComma },
-            { ' ', ParseBySpace },
-        };
+            _separatorParsers = new Dictionary<char, Func<string, Person>>
+            {
+                { '|', ParseByPipe },
+                { ',', ParseByComma },
+                { ' ', ParseBySpace },
+            };
+        }
 
         public Person Parse(string record)
         {
@@ -22,7 +30,7 @@ namespace DataSorter
             return person;
         }
 
-        private static Person ParseByPipe(string record)
+        private Person ParseByPipe(string record)
         {
             Person person = null;
 
@@ -42,7 +50,7 @@ namespace DataSorter
 
             DateTime dateOfBirth;
 
-            if (fields.Length < 6 || !DateTime.TryParse(fields[5], out dateOfBirth))
+            if (fields.Length < 6 || !DateTime.TryParseExact(fields[5], "M/d/yyyy", _culture, DateTimeStyles.AssumeUniversal, out dateOfBirth))
             {
                 dateOfBirth = DateTime.MinValue;
             }
@@ -60,7 +68,7 @@ namespace DataSorter
             return person;
         }
 
-        private static Person ParseByComma(string record)
+        private Person ParseByComma(string record)
         {
             Person person = null;
 
@@ -80,7 +88,7 @@ namespace DataSorter
 
             DateTime dateOfBirth;
 
-            if (fields.Length < 5 || !DateTime.TryParse(fields[4], out dateOfBirth))
+            if (fields.Length < 5 || !DateTime.TryParseExact(fields[4], "M/d/yyyy", _culture, DateTimeStyles.AssumeUniversal, out dateOfBirth))
             {
                 dateOfBirth = DateTime.MinValue;
             }
@@ -97,7 +105,7 @@ namespace DataSorter
             return person;
         }
 
-        private static Person ParseBySpace(string record)
+        private Person ParseBySpace(string record)
         {
             Person person = null;
 
@@ -117,7 +125,7 @@ namespace DataSorter
 
             DateTime dateOfBirth;
 
-            if (fields.Length < 5 || !DateTime.TryParse(fields[4], out dateOfBirth))
+            if (fields.Length < 5 || !DateTime.TryParseExact(fields[4], "M/d/yyyy", _culture, DateTimeStyles.AssumeUniversal, out dateOfBirth))
             {
                 dateOfBirth = DateTime.MinValue;
             }
