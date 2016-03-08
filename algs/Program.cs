@@ -10,13 +10,14 @@ namespace algs
         static void Main(string[] args)
         {
             // Sorting Demo (http://www.sorting-algorithms.com/)
-            var sortedArraySize = 10;
+            var sortedArraySize = 15000;
 
             new List<SortBase<int>>
             {
                 new BubbleSort<int>(GenerateArray(sortedArraySize)),
                 new MergeSort<int>(GenerateArray(sortedArraySize)),
                 new QuickSort<int>(GenerateArray(sortedArraySize)),
+                new Quick3Sort<int>(GenerateArray(sortedArraySize)),
                 new HeapSort<int>(GenerateArray(sortedArraySize)),
                 new InsertionSort<int>(GenerateArray(sortedArraySize))
             }.ForEach(s => { s.Sort(); s.WriteOutput(); });
