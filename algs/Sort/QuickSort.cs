@@ -48,6 +48,6 @@ namespace algs.Sort
             return partitionIndex;
         }
 
-        public override string Algorythm => "QuickSort";
+        protected override string Algorythm => "QuickSort";
     }
 }

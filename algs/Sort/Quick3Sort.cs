@@ -38,6 +38,6 @@ namespace algs.Sort
             array[y] = temp;
         }
 
-        public override string Algorythm => "3WayQuickSort";
+        protected override string Algorythm => "3WayQuickSort";
     }
 }

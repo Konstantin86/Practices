@@ -13,13 +13,15 @@ namespace algs.Sort
             _array = array;
         }
 
-        public void Sort()
+        public T[] Sort()
         {
             var sw = new Stopwatch();
             sw.Start();
             ExecuteSort();
             sw.Stop();
             _elapsed = sw.Elapsed;
+
+            return _array;
         }
 
         protected abstract void ExecuteSort();

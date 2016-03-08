@@ -22,6 +22,6 @@ namespace algs.Sort
                 }
         }
 
-        public override string Algorythm => "BubbleSort";
+        protected override string Algorythm => "BubbleSort";
     }
 }

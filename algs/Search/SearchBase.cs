@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace algs.Search
@@ -31,7 +30,8 @@ namespace algs.Search
         protected abstract TValue ExecuteSearch();
 
         protected abstract string Algorythm { get; }
-        public void WriteOutput(bool showResultArray = false)
+
+        public void WriteOutput(bool showResultArray = true)
         {
             {
                 Console.WriteLine("========{0}========", Algorythm);
@@ -45,25 +45,4 @@ namespace algs.Search
             }
         }
     }
-
-    class LinearSearch<T, TValue> : SearchBase<T, TValue> where T : IList<TValue> where TValue : IComparable
-    {
-        public LinearSearch(T dataStructure) : base(dataStructure)
-        {
-        }
-
-        protected override TValue ExecuteSearch()
-        {
-            for (int i = 0; i < _dataStructure.Count - 1; i++)
-                if (_dataStructure[i].CompareTo(_value) == 0)
-                {
-                    _position = i.ToString();
-                    return _dataStructure[i];
-                }
-
-            _position = "-1";
-            return default(TValue);
-        }
-
-        protected override string Algorythm => "LinearSearch";
-    }
+}

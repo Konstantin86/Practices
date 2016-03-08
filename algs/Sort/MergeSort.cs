@@ -43,6 +43,6 @@ namespace algs.Sort
             return merged;
         }
 
-        public override string Algorythm => "MergeSort";
+        protected override string Algorythm => "MergeSort";
     }
 }

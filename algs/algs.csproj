@@ -43,6 +43,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DataStructures\RedBlackTree.cs" />
+    <Compile Include="DataStructures\Tree.cs" />
+    <Compile Include="Interview\ClassicTasks.cs" />
+    <Compile Include="Search\BinarySearch.cs" />
+    <Compile Include="Search\LinearSearch.cs" />
     <Compile Include="Search\SearchBase.cs" />
     <Compile Include="Sort\BubbleSort.cs" />
     <Compile Include="IAlgBase.cs" />
@@ -58,6 +63,7 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

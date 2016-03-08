@@ -34,6 +34,6 @@ namespace algs.Sort
             return array;
         }
 
-        public override string Algorythm => "InsertionSort";
+        protected override string Algorythm => "InsertionSort";
     }
 }

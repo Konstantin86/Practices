@@ -57,6 +57,6 @@ namespace algs.Sort
             }
         }
 
-        public override string Algorythm => "HeapSort";
+        protected override string Algorythm => "HeapSort";
     }
 }
