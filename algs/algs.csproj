@@ -43,6 +43,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Search\SearchBase.cs" />
     <Compile Include="Sort\BubbleSort.cs" />
     <Compile Include="IAlgBase.cs" />
     <Compile Include="Sort\HeapSort.cs" />

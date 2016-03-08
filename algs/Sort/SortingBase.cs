@@ -24,7 +24,7 @@ namespace algs.Sort
 
         protected abstract void ExecuteSort();
 
-        public abstract string Algorythm { get; }
+        protected abstract string Algorythm { get; }
 
         public void WriteOutput(bool showResultArray = false)
         {
