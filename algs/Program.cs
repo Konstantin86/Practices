@@ -12,6 +12,12 @@ namespace algs
     {
         static void Main(string[] args)
         {
+            IEnumerable<object> enumerable = Enumerable.Empty<object>();
+            enumerable = null;
+            List<object> sss = enumerable.Select(c => c).ToList();
+
+            Console.ReadKey();
+
             // Sorting Demo (http://www.sorting-algorithms.com/)
             var sortedArraySize = 10;
 
