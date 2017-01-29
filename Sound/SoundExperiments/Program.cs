@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Speech.Recognition;
 using System.Text;
@@ -11,6 +12,8 @@ using CSCore.Codecs.WAV;
 using CSCore.CoreAudioAPI;
 using CSCore.SoundIn;
 using CSCore.Streams;
+using CUETools.Codecs;
+using CUETools.Codecs.FLAKE;
 
 namespace SoundExperiments
 {
@@ -79,7 +82,6 @@ namespace SoundExperiments
                 //optional: set some properties 
                 soundIn.Device = device;
                 //...
-
                 //initialize the soundIn instance
                 soundIn.Initialize();
 
@@ -102,7 +104,6 @@ namespace SoundExperiments
                     //create a new wavefile
                     using (WaveWriter waveWriter = new WaveWriter("out.wav", convertedSource.WaveFormat))
                     {
-
                         //register an event handler for the DataAvailable event of 
                         //the soundInSource
                         //Important: use the DataAvailable of the SoundInSource
@@ -143,42 +144,58 @@ namespace SoundExperiments
 
 
 
+            //     Dim fl2 As FlakeWriter
+            // Dim fil As New IO.FileStream("c:\MISSION2\rr.wav", IO.FileMode.Open, IO.FileAccess.ReadWrite)
+            // fl2 = New FlakeWriter("c:\MISSION2\ttl.flac", 16, 2, 8000, fil)
+            // Dim audioSource = New WAVReader(Nothing, fil)
+            // Dim buff = New CUETools.Codecs.AudioPipe(audioSource, 65536)
+            //fl2.Write()
 
+            using (Stream io = new FileStream("out.wav", FileMode.Open, FileAccess.Read))
+            {
+                var audioSource = new WAVReader(null, io);
 
+                var buff = new AudioBuffer(audioSource, 0x10000);
 
+                var fl = new FlakeWriter("out.flac", 16, 1, 16000, io);
+                while (audioSource.Read(buff, -1) != 0)
+                {
+                    fl.Write(buff);
+                }
+            }
 
             // Initialize an in-process speech recognition engine.
-            using (SpeechRecognitionEngine recognizer =
-               new SpeechRecognitionEngine())
-            {
-
-                // Create and load a grammar.
-                Grammar dictation = new DictationGrammar();
-                dictation.Name = "Dictation Grammar";
-
-                recognizer.LoadGrammar(dictation);
-
-                // Configure the input to the recognizer.
-                recognizer.SetInputToWaveFile("out.wav");
-
-                // Attach event handlers for the results of recognition.
-                recognizer.SpeechRecognized +=
-                  new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
-                recognizer.RecognizeCompleted +=
-                  new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
-
-                // Perform recognition on the entire file.
-                Console.WriteLine("Starting asynchronous recognition...");
-                completed = false;
-                recognizer.RecognizeAsync(RecognizeMode.Multiple);
-
-                // Keep the console window open.
-                while (!completed)
+                using (SpeechRecognitionEngine recognizer =
+                   new SpeechRecognitionEngine())
                 {
-                    Console.ReadLine();
+
+                    // Create and load a grammar.
+                    Grammar dictation = new DictationGrammar();
+                    dictation.Name = "Dictation Grammar";
+
+                    recognizer.LoadGrammar(dictation);
+
+                    // Configure the input to the recognizer.
+                    recognizer.SetInputToWaveFile("out.wav");
+
+                    // Attach event handlers for the results of recognition.
+                    recognizer.SpeechRecognized +=
+                      new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
+                    recognizer.RecognizeCompleted +=
+                      new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
+
+                    // Perform recognition on the entire file.
+                    Console.WriteLine("Starting asynchronous recognition...");
+                    completed = false;
+                    recognizer.Recognize();
+
+                    // Keep the console window open.
+                    while (!completed)
+                    {
+                        Console.ReadLine();
+                    }
+                    Console.WriteLine("Done.");
                 }
-                Console.WriteLine("Done.");
-            }
 
 
 
