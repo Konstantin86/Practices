@@ -12,6 +12,7 @@
 
 # Mongo data folder
 mongo/data
+mongo/log
 
 # Build results
 [Dd]ebug/
