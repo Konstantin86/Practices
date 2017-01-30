@@ -24,7 +24,6 @@ namespace SoundExperiments
         static void Main(string[] args)
         {
 
-
             //choose the capture mode
             Console.WriteLine("Select capturing mode:");
             Console.WriteLine("- 1: Capture");
@@ -100,7 +99,7 @@ namespace SoundExperiments
                 //channels...
                 using (convertedSource = channels == 1 ? convertedSource.ToMono() : convertedSource.ToStereo())
                 {
-
+                    //convertedSource.WaveFormat = new WaveFormat(16000, 16, 1, );
                     //create a new wavefile
                     using (WaveWriter waveWriter = new WaveWriter("out.wav", convertedSource.WaveFormat))
                     {
@@ -144,6 +143,10 @@ namespace SoundExperiments
 
 
 
+
+            //TODO insert resample part (to mono) use https://naudio.codeplex.com/releases/view/630221 demos as example
+
+
             //     Dim fl2 As FlakeWriter
             // Dim fil As New IO.FileStream("c:\MISSION2\rr.wav", IO.FileMode.Open, IO.FileAccess.ReadWrite)
             // fl2 = New FlakeWriter("c:\MISSION2\ttl.flac", 16, 2, 8000, fil)
@@ -151,17 +154,24 @@ namespace SoundExperiments
             // Dim buff = New CUETools.Codecs.AudioPipe(audioSource, 65536)
             //fl2.Write()
 
-            using (Stream io = new FileStream("out.wav", FileMode.Open, FileAccess.Read))
+            using (Stream io = new FileStream("out_resampled.wav", FileMode.Open, FileAccess.Read))
             {
-                var audioSource = new WAVReader(null, io);
-
-                var buff = new AudioBuffer(audioSource, 0x10000);
-
-                var fl = new FlakeWriter("out.flac", 16, 1, 16000, io);
-                while (audioSource.Read(buff, -1) != 0)
+                using (var outStream = new FileStream("testtest.flac", FileMode.Create, FileAccess.ReadWrite))
                 {
-                    fl.Write(buff);
+                    ConvertToFlac(io, outStream);
                 }
+                
+
+
+                //var audioSource = new WAVReader(null, io);
+
+                //var buff = new AudioBuffer(audioSource, 0x10000);
+
+                //var fl = new FlakeWriter("out.flac", 16, 1, 16000, io);
+                //while (audioSource.Read(buff, -1) != 0)
+                //{
+                //    fl.Write(buff);
+                //}
             }
 
             // Initialize an in-process speech recognition engine.
@@ -217,6 +227,33 @@ namespace SoundExperiments
             else
             {
                 Console.WriteLine("  Recognized text not available.");
+            }
+        }
+
+        private static void ConvertToFlac(Stream sourceStream, Stream destinationStream)
+        {
+            var audioSource = new WAVReader(null, sourceStream);
+            
+            try
+            {
+                if (audioSource.PCM.SampleRate != 16000)
+                {
+                    throw new InvalidOperationException("Incorrect frequency - WAV file must be at 16 KHz.");
+                }
+                var buff = new AudioBuffer(audioSource, 0x10000);
+
+                var flakeWriter = new FlakeWriter(null, destinationStream, audioSource.PCM);
+//                flakeWriter.CompressionLevel = 8;
+
+                while (audioSource.Read(buff, -1) != 0)
+                {
+                    flakeWriter.Write(buff);
+                }
+                flakeWriter.Close();
+            }
+            finally
+            {
+                audioSource.Close();
             }
         }
 
