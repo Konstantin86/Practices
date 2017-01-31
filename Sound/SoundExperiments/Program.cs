@@ -38,11 +38,13 @@ namespace SoundExperiments
 
             ConvertToFlac();
 
-            RecognizeWithGoogle();
+            RecognizeWithGoogle(); - 
+                // $1.44 per 1 hour
 
             //RecognizeViaMicrosoft();
 
             // TODO Translate to russian...
+            https://cloud.google.com/translate/ - 20$ per 1 million of characters
         }
 
         private static void RecognizeWithGoogle()
