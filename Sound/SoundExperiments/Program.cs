@@ -14,6 +14,9 @@ using CSCore.SoundIn;
 using CSCore.Streams;
 using CUETools.Codecs;
 using CUETools.Codecs.FLAKE;
+using NAudio.Wave;
+using WasapiLoopbackCapture = CSCore.SoundIn.WasapiLoopbackCapture;
+using WaveFormat = CSCore.WaveFormat;
 
 namespace SoundExperiments
 {
@@ -23,7 +26,37 @@ namespace SoundExperiments
         // ReSharper disable once UnusedParameter.Local
         static void Main(string[] args)
         {
+            if (RecordWav())
+            {
+                return;
+            }
 
+            ResampleToMono();
+
+            ConvertToFlac();
+
+            //RecognizeViaMicrosoft();
+        }
+
+        private static void ResampleToMono()
+        {
+            using (var reader = new MediaFoundationReader("out.wav"))
+            {
+                using (var resampler = new MediaFoundationResampler(reader, CreateOutputFormat(reader.WaveFormat)))
+                {
+                    WaveFileWriter.CreateWaveFile("out_resampled.wav", resampler);
+                }
+            }
+        }
+
+        private static NAudio.Wave.WaveFormat CreateOutputFormat(NAudio.Wave.WaveFormat inputFormat)
+        {
+            var waveFormat = new NAudio.Wave.WaveFormat(inputFormat.SampleRate, inputFormat.BitsPerSample, 1);
+            return waveFormat;
+        }
+
+        private static bool RecordWav()
+        {
             //choose the capture mode
             Console.WriteLine("Select capturing mode:");
             Console.WriteLine("- 1: Capture");
@@ -39,7 +72,7 @@ namespace SoundExperiments
             if (!devices.Any())
             {
                 Console.WriteLine("No devices found.");
-                return;
+                return true;
             }
 
             Console.WriteLine("Select device:");
@@ -138,83 +171,52 @@ namespace SoundExperiments
                     }
                 }
             }
+            return false;
+        }
 
-            //Process.Start("out.wav");
-
-
-
-
-            //TODO insert resample part (to mono) use https://naudio.codeplex.com/releases/view/630221 demos as example
-
-
-            //     Dim fl2 As FlakeWriter
-            // Dim fil As New IO.FileStream("c:\MISSION2\rr.wav", IO.FileMode.Open, IO.FileAccess.ReadWrite)
-            // fl2 = New FlakeWriter("c:\MISSION2\ttl.flac", 16, 2, 8000, fil)
-            // Dim audioSource = New WAVReader(Nothing, fil)
-            // Dim buff = New CUETools.Codecs.AudioPipe(audioSource, 65536)
-            //fl2.Write()
-
+        private static void ConvertToFlac()
+        {
             using (Stream io = new FileStream("out_resampled.wav", FileMode.Open, FileAccess.Read))
             {
                 using (var outStream = new FileStream("testtest.flac", FileMode.Create, FileAccess.ReadWrite))
                 {
                     ConvertToFlac(io, outStream);
                 }
-                
-
-
-                //var audioSource = new WAVReader(null, io);
-
-                //var buff = new AudioBuffer(audioSource, 0x10000);
-
-                //var fl = new FlakeWriter("out.flac", 16, 1, 16000, io);
-                //while (audioSource.Read(buff, -1) != 0)
-                //{
-                //    fl.Write(buff);
-                //}
             }
+        }
 
-            // Initialize an in-process speech recognition engine.
-                using (SpeechRecognitionEngine recognizer =
-                   new SpeechRecognitionEngine())
+        private static void RecognizeViaMicrosoft()
+        {
+            using (SpeechRecognitionEngine recognizer =
+                new SpeechRecognitionEngine())
+            {
+                // Create and load a grammar.
+                Grammar dictation = new DictationGrammar();
+                dictation.Name = "Dictation Grammar";
+
+                recognizer.LoadGrammar(dictation);
+
+                // Configure the input to the recognizer.
+                recognizer.SetInputToWaveFile("out.wav");
+
+                // Attach event handlers for the results of recognition.
+                recognizer.SpeechRecognized +=
+                    new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
+                recognizer.RecognizeCompleted +=
+                    new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
+
+                // Perform recognition on the entire file.
+                Console.WriteLine("Starting asynchronous recognition...");
+                completed = false;
+                recognizer.Recognize();
+
+                // Keep the console window open.
+                while (!completed)
                 {
-
-                    // Create and load a grammar.
-                    Grammar dictation = new DictationGrammar();
-                    dictation.Name = "Dictation Grammar";
-
-                    recognizer.LoadGrammar(dictation);
-
-                    // Configure the input to the recognizer.
-                    recognizer.SetInputToWaveFile("out.wav");
-
-                    // Attach event handlers for the results of recognition.
-                    recognizer.SpeechRecognized +=
-                      new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
-                    recognizer.RecognizeCompleted +=
-                      new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
-
-                    // Perform recognition on the entire file.
-                    Console.WriteLine("Starting asynchronous recognition...");
-                    completed = false;
-                    recognizer.Recognize();
-
-                    // Keep the console window open.
-                    while (!completed)
-                    {
-                        Console.ReadLine();
-                    }
-                    Console.WriteLine("Done.");
+                    Console.ReadLine();
                 }
-
-
-
-
-
-
-
-
-
+                Console.WriteLine("Done.");
+            }
         }
 
         // Handle the SpeechRecognized event.
@@ -233,7 +235,7 @@ namespace SoundExperiments
         private static void ConvertToFlac(Stream sourceStream, Stream destinationStream)
         {
             var audioSource = new WAVReader(null, sourceStream);
-            
+
             try
             {
                 if (audioSource.PCM.SampleRate != 16000)
@@ -243,7 +245,7 @@ namespace SoundExperiments
                 var buff = new AudioBuffer(audioSource, 0x10000);
 
                 var flakeWriter = new FlakeWriter(null, destinationStream, audioSource.PCM);
-//                flakeWriter.CompressionLevel = 8;
+                //                flakeWriter.CompressionLevel = 8;
 
                 while (audioSource.Read(buff, -1) != 0)
                 {
