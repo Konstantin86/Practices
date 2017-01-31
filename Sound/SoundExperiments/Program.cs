@@ -14,6 +14,9 @@ using CSCore.SoundIn;
 using CSCore.Streams;
 using CUETools.Codecs;
 using CUETools.Codecs.FLAKE;
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.CloudSpeechAPI.v1beta1;
+using Google.Apis.Services;
 using NAudio.Wave;
 using WasapiLoopbackCapture = CSCore.SoundIn.WasapiLoopbackCapture;
 using WaveFormat = CSCore.WaveFormat;
@@ -35,7 +38,56 @@ namespace SoundExperiments
 
             ConvertToFlac();
 
+            RecognizeWithGoogle();
+
             //RecognizeViaMicrosoft();
+
+            // TODO Translate to russian...
+        }
+
+        private static void RecognizeWithGoogle()
+        {
+            var service = CreateAuthorizedClient();
+
+            string audio_file_path = "testtest.flac";
+
+            var request = new Google.Apis.CloudSpeechAPI.v1beta1.Data.SyncRecognizeRequest()
+            {
+                Config = new Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionConfig()
+                {
+                    Encoding = "FLAC",
+                    SampleRate = 16000,
+                    LanguageCode = "en-US"
+                },
+                Audio = new Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionAudio()
+                {
+                    Content = Convert.ToBase64String(File.ReadAllBytes(audio_file_path))
+                }
+            };
+            var response = service.Speech.Syncrecognize(request).Execute();
+            foreach (var result in response.Results)
+            {
+                foreach (var alternative in result.Alternatives)
+                    Console.WriteLine(alternative.Transcript);
+            }
+        }
+
+        private static CloudSpeechAPIService CreateAuthorizedClient()
+        {
+            GoogleCredential credential =
+                GoogleCredential.GetApplicationDefaultAsync().Result;
+            if (credential.IsCreateScopedRequired)
+            {
+                credential = credential.CreateScoped(new[]
+                {
+                    CloudSpeechAPIService.Scope.CloudPlatform
+                });
+            }
+            return new CloudSpeechAPIService(new BaseClientService.Initializer()
+            {
+                HttpClientInitializer = credential,
+                ApplicationName = "DotNet Google Cloud Platform Speech Sample",
+            });
         }
 
         private static void ResampleToMono()
