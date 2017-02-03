@@ -17,7 +17,9 @@ using CUETools.Codecs.FLAKE;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.CloudSpeechAPI.v1beta1;
 using Google.Apis.Services;
+using Google.Cloud.Speech.V1Beta1;
 using NAudio.Wave;
+using RecognitionConfig = Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionConfig;
 using WasapiLoopbackCapture = CSCore.SoundIn.WasapiLoopbackCapture;
 using WaveFormat = CSCore.WaveFormat;
 
@@ -38,13 +40,128 @@ namespace SoundExperiments
 
             ConvertToFlac();
 
-            RecognizeWithGoogle(); - 
-                // $1.44 per 1 hour
+            //RecognizeWithGoogle();
+
+//            AsyncRecognizeWithGoogle();
+
+            var asyncStreamingRecognizeResult = AsyncStreamingRecognizeWithGoogle("out_resampled.wav").Result;
+            // $1.44 per 1 hour
 
             //RecognizeViaMicrosoft();
 
             // TODO Translate to russian...
-            https://cloud.google.com/translate/ - 20$ per 1 million of characters
+            //https://cloud.google.com/translate/ - 20$ per 1 million of characters
+        }
+
+        /// <summary>
+        /// Stream the content of the file to the API in 32kb chunks.
+        /// </summary>
+        // [START speech_streaming_recognize]
+        static async Task<object> AsyncStreamingRecognizeWithGoogle(string filePath)
+        {
+            var speech = SpeechClient.Create();
+            var streamingCall = speech.GrpcClient.StreamingRecognize();
+            // Write the initial request with the config.
+            await streamingCall.RequestStream.WriteAsync(
+                new StreamingRecognizeRequest()
+                {
+                    StreamingConfig = new StreamingRecognitionConfig()
+                    {
+                        Config = new Google.Cloud.Speech.V1Beta1.RecognitionConfig()
+                        {
+                            Encoding =
+                            Google.Cloud.Speech.V1Beta1.RecognitionConfig.Types.AudioEncoding.Linear16,
+                            SampleRate = 16000,
+                            //LanguageCode = "ru-RU"
+                        },
+                        InterimResults = true,
+                    }
+                });
+            // Print responses as they arrive.
+            Task printResponses = Task.Run(async () =>
+            {
+                while (await streamingCall.ResponseStream.MoveNext(
+                    default(CancellationToken)))
+                {
+                    foreach (var result in streamingCall.ResponseStream
+                        .Current.Results)
+                    {
+                        foreach (var alternative in result.Alternatives)
+                        {
+                            Console.WriteLine(alternative.Transcript);
+                        }
+                    }
+                }
+            });
+            // Stream the file content to the API.  Write 2 32kb chunks per 
+            // second.
+            using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
+            {
+                var buffer = new byte[32 * 1024];
+                int bytesRead;
+                while ((bytesRead = await fileStream.ReadAsync(
+                    buffer, 0, buffer.Length)) > 0)
+                {
+                    await streamingCall.RequestStream.WriteAsync(
+                        new StreamingRecognizeRequest()
+                        {
+                            AudioContent = Google.Protobuf.ByteString
+                            .CopyFrom(buffer, 0, bytesRead),
+                        });
+                    await Task.Delay(500);
+                };
+            }
+            await streamingCall.RequestStream.CompleteAsync();
+            await printResponses;
+            return 0;
+        }
+
+        private static void AsyncRecognizeWithGoogle()
+        {
+            var service = CreateAuthorizedClient();
+
+            // Async recognize can work only with wav
+            string audio_file_path = "out_resampled.wav";
+
+            // [END run_application]
+            // [START construct_request]
+            var request = new Google.Apis.CloudSpeechAPI.v1beta1.Data.AsyncRecognizeRequest()
+            {
+                Config = new Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionConfig()
+                {
+                    Encoding = "LINEAR16",
+                    SampleRate = 16000,
+                    //LanguageCode = "en-US"
+                    LanguageCode = "ru-RU"
+                },
+                Audio = new Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionAudio()
+                {
+                    Content = Convert.ToBase64String(File.ReadAllBytes(audio_file_path))
+                }
+            };
+            // [END construct_request]
+            // [START send_request]
+            var asyncResponse = service.Speech.Asyncrecognize(request).Execute();
+            var name = asyncResponse.Name;
+            Google.Apis.CloudSpeechAPI.v1beta1.Data.Operation op;
+            do
+            {
+                Console.WriteLine("Waiting for server processing...");
+                Thread.Sleep(1000);
+                op = service.Operations.Get(name).Execute();
+            } while (!(op.Done.HasValue && op.Done.Value));
+            dynamic results = op.Response["results"];
+
+            string output = string.Empty;
+
+            foreach (var result in results)
+            {
+                foreach (var alternative in result.alternatives)
+                {
+                    Console.WriteLine(alternative.transcript);
+                    output += alternative.transcript;
+                }
+            }
         }
 
         private static void RecognizeWithGoogle()
