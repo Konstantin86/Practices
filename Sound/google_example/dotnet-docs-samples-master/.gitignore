@@ -1,0 +1,13 @@
+bin/
+obj/
+packages/
+*.suo
+.nuget/
+TestResults/
+*.csproj.user
+.idea/
+*.iml
+PublishProfiles/
+*.sln.DotSettings.user
+.vs/
+*~
