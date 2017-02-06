@@ -12,8 +12,8 @@ using CSCore.Codecs.WAV;
 using CSCore.CoreAudioAPI;
 using CSCore.SoundIn;
 using CSCore.Streams;
-using CUETools.Codecs;
-using CUETools.Codecs.FLAKE;
+//using CUETools.Codecs;
+//using CUETools.Codecs.FLAKE;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.CloudSpeechAPI.v1beta1;
 using Google.Apis.Services;
@@ -28,27 +28,28 @@ namespace SoundExperiments
     class Program
     {
         static bool completed;
+        static readonly TimeSpan RecognitionFrameLength = TimeSpan.FromSeconds(55);
         // ReSharper disable once UnusedParameter.Local
         static void Main(string[] args)
         {
-            if (RecordWav())
-            {
-                return;
-            }
+            //if (RecordWav())
+            //{
+            //    return;
+            //}
 
-            ResampleToMono();
+            //ResampleToMono();
 
-            ConvertToFlac();
+            //ConvertToFlac();
 
-            //RecognizeWithGoogle();
+            RecognizeWithGoogle();
 
 //            AsyncRecognizeWithGoogle();
 
-            var asyncStreamingRecognizeResult = AsyncStreamingRecognizeWithGoogle("out_resampled.wav").Result;
+            //var asyncStreamingRecognizeResult = AsyncStreamingRecognizeWithGoogle("out_resampled.wav").Result;
             // $1.44 per 1 hour
 
             //RecognizeViaMicrosoft();
-
+            Console.ReadKey();
             // TODO Translate to russian...
             //https://cloud.google.com/translate/ - 20$ per 1 million of characters
         }
@@ -168,15 +169,15 @@ namespace SoundExperiments
         {
             var service = CreateAuthorizedClient();
 
-            string audio_file_path = "testtest.flac";
+            string audio_file_path = "out_resampled.wav";
 
             var request = new Google.Apis.CloudSpeechAPI.v1beta1.Data.SyncRecognizeRequest()
             {
                 Config = new Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionConfig()
                 {
-                    Encoding = "FLAC",
+                    Encoding = Google.Cloud.Speech.V1Beta1.RecognitionConfig.Types.AudioEncoding.Linear16.ToString(),
                     SampleRate = 16000,
-                    LanguageCode = "en-US"
+                    LanguageCode = "ru-RU"
                 },
                 Audio = new Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionAudio()
                 {
@@ -184,10 +185,14 @@ namespace SoundExperiments
                 }
             };
             var response = service.Speech.Syncrecognize(request).Execute();
+            string allText = "";
             foreach (var result in response.Results)
             {
                 foreach (var alternative in result.Alternatives)
+                {
                     Console.WriteLine(alternative.Transcript);
+                    allText += alternative.Transcript;
+                }
             }
         }
 
@@ -229,11 +234,11 @@ namespace SoundExperiments
         private static bool RecordWav()
         {
             //choose the capture mode
-            Console.WriteLine("Select capturing mode:");
-            Console.WriteLine("- 1: Capture");
-            Console.WriteLine("- 2: LoopbackCapture");
+            //Console.WriteLine("Select capturing mode:");
+            //Console.WriteLine("- 1: Capture");
+            //Console.WriteLine("- 2: LoopbackCapture");
 
-            CaptureMode captureMode = (CaptureMode)ReadInteger(1, 2);
+            CaptureMode captureMode = CaptureMode.LoopbackCapture;
             DataFlow dataFlow = captureMode == CaptureMode.Capture ? DataFlow.Capture : DataFlow.Render;
 
             //---
@@ -255,29 +260,10 @@ namespace SoundExperiments
             var device = devices[selectedDeviceIndex];
 
             //--- choose format
-            Console.WriteLine("Enter sample rate:");
-            int sampleRate;
-            do
-            {
-                sampleRate = ReadInteger();
-                if (sampleRate >= 100 && sampleRate <= 200000)
-                    break;
-                Console.WriteLine("Must be between 1kHz and 200kHz.");
-            } while (true);
+            int sampleRate = 16000;
+            int bitsPerSample = 16;
+            int channels = 2;
 
-            Console.WriteLine("Choose bits per sample (8, 16, 24 or 32):");
-            int bitsPerSample = ReadInteger(8, 16, 24, 32);
-
-            //note: this sample does not support multi channel formats like surround 5.1,...
-            //if this is required, the DmoChannelResampler class can be used
-            Console.WriteLine("Choose number of channels (1, 2):");
-            int channels = ReadInteger(1, 2);
-
-            //---
-
-            //start recording
-
-            //create a new soundIn instance
             using (WasapiCapture soundIn = captureMode == CaptureMode.Capture
                 ? new WasapiCapture()
                 : new WasapiLoopbackCapture())
@@ -335,25 +321,15 @@ namespace SoundExperiments
                         //we've set everything we need -> start capturing data
                         soundIn.Start();
 
-                        Console.WriteLine("Capturing started ... press any key to stop.");
-                        Console.ReadKey();
+                        Thread.Sleep(RecognitionFrameLength);
+                        //Console.WriteLine("Capturing started ... press any key to stop.");
+                        //Console.ReadKey();
 
                         soundIn.Stop();
                     }
                 }
             }
             return false;
-        }
-
-        private static void ConvertToFlac()
-        {
-            using (Stream io = new FileStream("out_resampled.wav", FileMode.Open, FileAccess.Read))
-            {
-                using (var outStream = new FileStream("testtest.flac", FileMode.Create, FileAccess.ReadWrite))
-                {
-                    ConvertToFlac(io, outStream);
-                }
-            }
         }
 
         private static void RecognizeViaMicrosoft()
@@ -400,33 +376,6 @@ namespace SoundExperiments
             else
             {
                 Console.WriteLine("  Recognized text not available.");
-            }
-        }
-
-        private static void ConvertToFlac(Stream sourceStream, Stream destinationStream)
-        {
-            var audioSource = new WAVReader(null, sourceStream);
-
-            try
-            {
-                if (audioSource.PCM.SampleRate != 16000)
-                {
-                    throw new InvalidOperationException("Incorrect frequency - WAV file must be at 16 KHz.");
-                }
-                var buff = new AudioBuffer(audioSource, 0x10000);
-
-                var flakeWriter = new FlakeWriter(null, destinationStream, audioSource.PCM);
-                //                flakeWriter.CompressionLevel = 8;
-
-                while (audioSource.Read(buff, -1) != 0)
-                {
-                    flakeWriter.Write(buff);
-                }
-                flakeWriter.Close();
-            }
-            finally
-            {
-                audioSource.Close();
             }
         }
 
