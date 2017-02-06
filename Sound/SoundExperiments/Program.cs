@@ -14,6 +14,14 @@ using CSCore.SoundIn;
 using CSCore.Streams;
 using CUETools.Codecs;
 using CUETools.Codecs.FLAKE;
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.CloudSpeechAPI.v1beta1;
+using Google.Apis.Services;
+using Google.Cloud.Speech.V1Beta1;
+using NAudio.Wave;
+using RecognitionConfig = Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionConfig;
+using WasapiLoopbackCapture = CSCore.SoundIn.WasapiLoopbackCapture;
+using WaveFormat = CSCore.WaveFormat;
 
 namespace SoundExperiments
 {
@@ -23,8 +31,203 @@ namespace SoundExperiments
         // ReSharper disable once UnusedParameter.Local
         static void Main(string[] args)
         {
+            if (RecordWav())
+            {
+                return;
+            }
 
+            ResampleToMono();
 
+            ConvertToFlac();
+
+            //RecognizeWithGoogle();
+
+//            AsyncRecognizeWithGoogle();
+
+            var asyncStreamingRecognizeResult = AsyncStreamingRecognizeWithGoogle("out_resampled.wav").Result;
+            // $1.44 per 1 hour
+
+            //RecognizeViaMicrosoft();
+
+            // TODO Translate to russian...
+            //https://cloud.google.com/translate/ - 20$ per 1 million of characters
+        }
+
+        /// <summary>
+        /// Stream the content of the file to the API in 32kb chunks.
+        /// </summary>
+        // [START speech_streaming_recognize]
+        static async Task<object> AsyncStreamingRecognizeWithGoogle(string filePath)
+        {
+            var speech = SpeechClient.Create();
+            var streamingCall = speech.GrpcClient.StreamingRecognize();
+            // Write the initial request with the config.
+            await streamingCall.RequestStream.WriteAsync(
+                new StreamingRecognizeRequest()
+                {
+                    StreamingConfig = new StreamingRecognitionConfig()
+                    {
+                        Config = new Google.Cloud.Speech.V1Beta1.RecognitionConfig()
+                        {
+                            Encoding =
+                            Google.Cloud.Speech.V1Beta1.RecognitionConfig.Types.AudioEncoding.Linear16,
+                            SampleRate = 16000,
+                            //LanguageCode = "ru-RU"
+                        },
+                        InterimResults = true,
+                    }
+                });
+            // Print responses as they arrive.
+            Task printResponses = Task.Run(async () =>
+            {
+                while (await streamingCall.ResponseStream.MoveNext(
+                    default(CancellationToken)))
+                {
+                    foreach (var result in streamingCall.ResponseStream
+                        .Current.Results)
+                    {
+                        foreach (var alternative in result.Alternatives)
+                        {
+                            Console.WriteLine(alternative.Transcript);
+                        }
+                    }
+                }
+            });
+            // Stream the file content to the API.  Write 2 32kb chunks per 
+            // second.
+            using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
+            {
+                var buffer = new byte[32 * 1024];
+                int bytesRead;
+                while ((bytesRead = await fileStream.ReadAsync(
+                    buffer, 0, buffer.Length)) > 0)
+                {
+                    await streamingCall.RequestStream.WriteAsync(
+                        new StreamingRecognizeRequest()
+                        {
+                            AudioContent = Google.Protobuf.ByteString
+                            .CopyFrom(buffer, 0, bytesRead),
+                        });
+                    await Task.Delay(500);
+                };
+            }
+            await streamingCall.RequestStream.CompleteAsync();
+            await printResponses;
+            return 0;
+        }
+
+        private static void AsyncRecognizeWithGoogle()
+        {
+            var service = CreateAuthorizedClient();
+
+            // Async recognize can work only with wav
+            string audio_file_path = "out_resampled.wav";
+
+            // [END run_application]
+            // [START construct_request]
+            var request = new Google.Apis.CloudSpeechAPI.v1beta1.Data.AsyncRecognizeRequest()
+            {
+                Config = new Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionConfig()
+                {
+                    Encoding = "LINEAR16",
+                    SampleRate = 16000,
+                    //LanguageCode = "en-US"
+                    LanguageCode = "ru-RU"
+                },
+                Audio = new Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionAudio()
+                {
+                    Content = Convert.ToBase64String(File.ReadAllBytes(audio_file_path))
+                }
+            };
+            // [END construct_request]
+            // [START send_request]
+            var asyncResponse = service.Speech.Asyncrecognize(request).Execute();
+            var name = asyncResponse.Name;
+            Google.Apis.CloudSpeechAPI.v1beta1.Data.Operation op;
+            do
+            {
+                Console.WriteLine("Waiting for server processing...");
+                Thread.Sleep(1000);
+                op = service.Operations.Get(name).Execute();
+            } while (!(op.Done.HasValue && op.Done.Value));
+            dynamic results = op.Response["results"];
+
+            string output = string.Empty;
+
+            foreach (var result in results)
+            {
+                foreach (var alternative in result.alternatives)
+                {
+                    Console.WriteLine(alternative.transcript);
+                    output += alternative.transcript;
+                }
+            }
+        }
+
+        private static void RecognizeWithGoogle()
+        {
+            var service = CreateAuthorizedClient();
+
+            string audio_file_path = "testtest.flac";
+
+            var request = new Google.Apis.CloudSpeechAPI.v1beta1.Data.SyncRecognizeRequest()
+            {
+                Config = new Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionConfig()
+                {
+                    Encoding = "FLAC",
+                    SampleRate = 16000,
+                    LanguageCode = "en-US"
+                },
+                Audio = new Google.Apis.CloudSpeechAPI.v1beta1.Data.RecognitionAudio()
+                {
+                    Content = Convert.ToBase64String(File.ReadAllBytes(audio_file_path))
+                }
+            };
+            var response = service.Speech.Syncrecognize(request).Execute();
+            foreach (var result in response.Results)
+            {
+                foreach (var alternative in result.Alternatives)
+                    Console.WriteLine(alternative.Transcript);
+            }
+        }
+
+        private static CloudSpeechAPIService CreateAuthorizedClient()
+        {
+            GoogleCredential credential =
+                GoogleCredential.GetApplicationDefaultAsync().Result;
+            if (credential.IsCreateScopedRequired)
+            {
+                credential = credential.CreateScoped(new[]
+                {
+                    CloudSpeechAPIService.Scope.CloudPlatform
+                });
+            }
+            return new CloudSpeechAPIService(new BaseClientService.Initializer()
+            {
+                HttpClientInitializer = credential,
+                ApplicationName = "DotNet Google Cloud Platform Speech Sample",
+            });
+        }
+
+        private static void ResampleToMono()
+        {
+            using (var reader = new MediaFoundationReader("out.wav"))
+            {
+                using (var resampler = new MediaFoundationResampler(reader, CreateOutputFormat(reader.WaveFormat)))
+                {
+                    WaveFileWriter.CreateWaveFile("out_resampled.wav", resampler);
+                }
+            }
+        }
+
+        private static NAudio.Wave.WaveFormat CreateOutputFormat(NAudio.Wave.WaveFormat inputFormat)
+        {
+            var waveFormat = new NAudio.Wave.WaveFormat(inputFormat.SampleRate, inputFormat.BitsPerSample, 1);
+            return waveFormat;
+        }
+
+        private static bool RecordWav()
+        {
             //choose the capture mode
             Console.WriteLine("Select capturing mode:");
             Console.WriteLine("- 1: Capture");
@@ -40,7 +243,7 @@ namespace SoundExperiments
             if (!devices.Any())
             {
                 Console.WriteLine("No devices found.");
-                return;
+                return true;
             }
 
             Console.WriteLine("Select device:");
@@ -100,7 +303,7 @@ namespace SoundExperiments
                 //channels...
                 using (convertedSource = channels == 1 ? convertedSource.ToMono() : convertedSource.ToStereo())
                 {
-
+                    //convertedSource.WaveFormat = new WaveFormat(16000, 16, 1, );
                     //create a new wavefile
                     using (WaveWriter waveWriter = new WaveWriter("out.wav", convertedSource.WaveFormat))
                     {
@@ -139,72 +342,52 @@ namespace SoundExperiments
                     }
                 }
             }
+            return false;
+        }
 
-            //Process.Start("out.wav");
-
-
-
-            //     Dim fl2 As FlakeWriter
-            // Dim fil As New IO.FileStream("c:\MISSION2\rr.wav", IO.FileMode.Open, IO.FileAccess.ReadWrite)
-            // fl2 = New FlakeWriter("c:\MISSION2\ttl.flac", 16, 2, 8000, fil)
-            // Dim audioSource = New WAVReader(Nothing, fil)
-            // Dim buff = New CUETools.Codecs.AudioPipe(audioSource, 65536)
-            //fl2.Write()
-
-            using (Stream io = new FileStream("out.wav", FileMode.Open, FileAccess.Read))
+        private static void ConvertToFlac()
+        {
+            using (Stream io = new FileStream("out_resampled.wav", FileMode.Open, FileAccess.Read))
             {
-                var audioSource = new WAVReader(null, io);
-
-                var buff = new AudioBuffer(audioSource, 0x10000);
-
-                var fl = new FlakeWriter("out.flac", 16, 1, 16000, io);
-                while (audioSource.Read(buff, -1) != 0)
+                using (var outStream = new FileStream("testtest.flac", FileMode.Create, FileAccess.ReadWrite))
                 {
-                    fl.Write(buff);
+                    ConvertToFlac(io, outStream);
                 }
             }
+        }
 
-            // Initialize an in-process speech recognition engine.
-                using (SpeechRecognitionEngine recognizer =
-                   new SpeechRecognitionEngine())
+        private static void RecognizeViaMicrosoft()
+        {
+            using (SpeechRecognitionEngine recognizer =
+                new SpeechRecognitionEngine())
+            {
+                // Create and load a grammar.
+                Grammar dictation = new DictationGrammar();
+                dictation.Name = "Dictation Grammar";
+
+                recognizer.LoadGrammar(dictation);
+
+                // Configure the input to the recognizer.
+                recognizer.SetInputToWaveFile("out.wav");
+
+                // Attach event handlers for the results of recognition.
+                recognizer.SpeechRecognized +=
+                    new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
+                recognizer.RecognizeCompleted +=
+                    new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
+
+                // Perform recognition on the entire file.
+                Console.WriteLine("Starting asynchronous recognition...");
+                completed = false;
+                recognizer.Recognize();
+
+                // Keep the console window open.
+                while (!completed)
                 {
-
-                    // Create and load a grammar.
-                    Grammar dictation = new DictationGrammar();
-                    dictation.Name = "Dictation Grammar";
-
-                    recognizer.LoadGrammar(dictation);
-
-                    // Configure the input to the recognizer.
-                    recognizer.SetInputToWaveFile("out.wav");
-
-                    // Attach event handlers for the results of recognition.
-                    recognizer.SpeechRecognized +=
-                      new EventHandler<SpeechRecognizedEventArgs>(recognizer_SpeechRecognized);
-                    recognizer.RecognizeCompleted +=
-                      new EventHandler<RecognizeCompletedEventArgs>(recognizer_RecognizeCompleted);
-
-                    // Perform recognition on the entire file.
-                    Console.WriteLine("Starting asynchronous recognition...");
-                    completed = false;
-                    recognizer.Recognize();
-
-                    // Keep the console window open.
-                    while (!completed)
-                    {
-                        Console.ReadLine();
-                    }
-                    Console.WriteLine("Done.");
+                    Console.ReadLine();
                 }
-
-
-
-
-
-
-
-
-
+                Console.WriteLine("Done.");
+            }
         }
 
         // Handle the SpeechRecognized event.
@@ -217,6 +400,33 @@ namespace SoundExperiments
             else
             {
                 Console.WriteLine("  Recognized text not available.");
+            }
+        }
+
+        private static void ConvertToFlac(Stream sourceStream, Stream destinationStream)
+        {
+            var audioSource = new WAVReader(null, sourceStream);
+
+            try
+            {
+                if (audioSource.PCM.SampleRate != 16000)
+                {
+                    throw new InvalidOperationException("Incorrect frequency - WAV file must be at 16 KHz.");
+                }
+                var buff = new AudioBuffer(audioSource, 0x10000);
+
+                var flakeWriter = new FlakeWriter(null, destinationStream, audioSource.PCM);
+                //                flakeWriter.CompressionLevel = 8;
+
+                while (audioSource.Read(buff, -1) != 0)
+                {
+                    flakeWriter.Write(buff);
+                }
+                flakeWriter.Close();
+            }
+            finally
+            {
+                audioSource.Close();
             }
         }
 
