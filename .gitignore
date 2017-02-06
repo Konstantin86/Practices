@@ -11,8 +11,8 @@
 *.userprefs
 
 # Mongo data folder
-mongo/data
-mongo/log
+mongo/data/
+mongo/log/
 
 # Build results
 [Dd]ebug/
